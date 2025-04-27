@@ -10,18 +10,6 @@ pub fn main() -> iced::Result {
         .run_with(|| {
             (
                 CicaModel {
-                    images: vec![
-                        ImageStub {
-                            id: 0,
-                            path: "/usr/images/super_image".into(),
-                            filename: "a.png".to_string(),
-                        },
-                        ImageStub {
-                            id: 1,
-                            path: "/usr/images/hyper_image".into(),
-                            filename: "Axjfe.png".to_string(),
-                        },
-                    ],
                     ..Default::default()
                 },
                 Task::none(),
