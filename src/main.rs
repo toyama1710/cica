@@ -1,6 +1,5 @@
-use cica::message::update;
 use cica::model::CicaModel;
-use cica::model::ImageStub;
+use cica::update::update;
 use cica::view::view;
 use iced::{application, Task};
 

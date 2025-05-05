@@ -1,5 +1,6 @@
 use crate::message::Message;
 use crate::model::CicaModel;
+use crate::view::*;
 use iced::widget::{
     button, column, container, row, scrollable, text, vertical_rule, Column, Container, Image, Row,
     Text,
@@ -7,16 +8,14 @@ use iced::widget::{
 use iced::Length;
 
 pub fn view(model: &CicaModel) -> Row<Message> {
-    let add_button = button("+ add image")
+    let add_button = button("+ add")
         .on_press(Message::AddImageClicked)
         .width(Length::Fill);
-    let images = model
-        .images
-        .iter()
-        .enumerate()
-        .fold(Column::new(), |col, (idx, info)| {
-            col.push(button(column![text(info.filename.clone()),]))
-        });
+    let side_images = sidebar_image_list(model);
 
-    row![add_button, images]
+    row![column![
+        add_button,
+        text(format!("{}", model.loading_files_count).to_owned()),
+        scrollable(Column::from_vec(side_images))
+    ]]
 }

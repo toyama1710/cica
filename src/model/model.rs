@@ -1,18 +1,31 @@
+use iced::widget::{image::Handle, Image};
+use image::RgbaImage;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Default)]
 pub struct CicaModel {
-    pub images: Vec<ImageStub>,
-    pub selected_image_idx: Option<usize>,
+    pub loading_files_count: usize,
+    pub images: Vec<ImgFileStatus>,
     pub active_main_tab: MainTab,
     pub error_message: Option<String>,
 }
 
 #[derive(Debug, Clone)]
-pub struct ImageStub {
-    pub id: usize,
+pub enum ImgFileStatus {
+    Loading(PathBuf),
+    // String はエラーメッセージ
+    NotImage((PathBuf, String)),
+    IOerror((PathBuf, String)),
+    Image(ImageItem),
+}
+
+#[derive(Debug, Clone)]
+pub struct ImageItem {
+    pub id: String,
     pub path: PathBuf,
     pub filename: String,
+    pub pixel: RgbaImage,
+    pub thumbnail_handle: Handle,
 }
 
 #[derive(Debug, Clone, Default)]
