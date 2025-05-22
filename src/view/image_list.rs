@@ -4,13 +4,35 @@ use crate::{
     view::thumbnail::*,
 };
 use iced::{
-    widget::{image, row, text},
-    Alignment::Center,
-    Element,
+    widget::{row, scrollable, text, Column},
+    Border, Color, Element, Theme,
 };
 
-pub fn sidebar_image_list(model: &CicaModel) -> Vec<Element<Message>> {
-    model
+fn hidden_scrollbar_style(_theme: &Theme, _status: scrollable::Status) -> scrollable::Style {
+    scrollable::Style {
+        container: iced::widget::container::Style::default(),
+        vertical_rail: scrollable::Rail {
+            background: Some(iced::Background::Color(Color::TRANSPARENT)),
+            border: iced::Border::default(),
+            scroller: scrollable::Scroller {
+                color: Color::TRANSPARENT,
+                border: Border::default(),
+            },
+        },
+        horizontal_rail: scrollable::Rail {
+            background: Some(iced::Background::Color(Color::TRANSPARENT)),
+            border: iced::Border::default(),
+            scroller: scrollable::Scroller {
+                color: Color::TRANSPARENT,
+                border: Border::default(),
+            },
+        },
+        gap: None,
+    }
+}
+
+pub fn sidebar_image_list(model: &CicaModel) -> Element<Message> {
+    let images = model
         .images
         .iter()
         .rev()
@@ -40,5 +62,8 @@ pub fn sidebar_image_list(model: &CicaModel) -> Vec<Element<Message>> {
             }
             .into()
         })
-        .collect()
+        .collect();
+    scrollable(Column::from_vec(images))
+        .style(hidden_scrollbar_style)
+        .into()
 }

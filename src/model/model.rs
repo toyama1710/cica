@@ -1,13 +1,13 @@
-use iced::widget::{image::Handle, Image};
+use iced::widget::{image::Handle, text_editor};
 use image::RgbaImage;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct CicaModel {
     pub loading_files_count: usize,
     pub images: Vec<ImgFileStatus>,
     pub active_main_tab: MainTab,
-    pub error_message: Option<String>,
+    pub expr_state: text_editor::Content,
 }
 
 #[derive(Debug, Clone)]

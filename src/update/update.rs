@@ -6,15 +6,12 @@ use iced::Task;
 use std::path::PathBuf;
 
 pub fn update(model: &mut CicaModel, message: Message) -> Task<Message> {
-    match message {
-        Message::AddImageClicked => {
-            #[cfg(debug_assertions)]
-            println!("Add Image button clicked");
+    #[cfg(debug_assertions)]
+    println!("{:?}", message);
 
-            Task::perform(pick_files(), Message::FilesPicked)
-        }
+    match message {
+        Message::AddImageClicked => Task::perform(pick_files(), Message::FilesPicked),
         Message::TabSelected(tab) => {
-            println!("Tab {:?} selected", tab);
             model.active_main_tab = tab;
             Task::none()
         }
@@ -23,9 +20,21 @@ pub fn update(model: &mut CicaModel, message: Message) -> Task<Message> {
             model.loading_files_count += handles.len();
             let mut tasks = vec![];
             for path in handles {
+                let idx = model.images.len();
                 model.images.push(ImgFileStatus::Loading(path.clone()));
+                /*
                 tasks.push(Task::perform(
-                    open_file(path.clone(), model.images.len() - 1),
+                    open_file(path.clone(), idx),
+                    Message::FileOpened,
+                ));
+                */
+                tasks.push(Task::perform(
+                    async move {
+                        tokio::task::spawn_blocking(move || open_file(path.clone(), idx))
+                            .await
+                            .unwrap()
+                            .await
+                    },
                     Message::FileOpened,
                 ));
             }
@@ -36,5 +45,10 @@ pub fn update(model: &mut CicaModel, message: Message) -> Task<Message> {
             model.images[idx] = f;
             Task::none()
         }
+        Message::ExprUpdated(action) => {
+            model.expr_state.perform(action);
+            Task::none()
+        }
+        Message::EvalExprRequested => Task::none(),
     }
 }
