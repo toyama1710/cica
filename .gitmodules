@@ -1,0 +1,3 @@
+[submodule "assets/elles_icc_profiles"]
+	path = assets/elles_icc_profiles
+	url = git@github.com:ellelstone/elles_icc_profiles.git
