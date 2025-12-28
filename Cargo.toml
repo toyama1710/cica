@@ -10,4 +10,4 @@ clap = { version = "4.5.53", features = ["derive"] }
 iced = "0.13.1"
 image = "0.25.9"
 lcms2 = "6.1.1"
-tokio = "1.48.0"
+tokio = { version = "1.48.0", features = ["rt-multi-thread", "macros", "fs"] }
