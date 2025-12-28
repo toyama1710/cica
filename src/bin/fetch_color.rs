@@ -1,6 +1,6 @@
 use clap::Parser;
-use image::{ColorType, ImageBuffer, ImageDecoder, ImageReader, Rgba};
-use moxcms::{ColorProfile, Layout, TransformOptions};
+use image::{ImageBuffer, ImageDecoder, ImageReader, Rgba};
+use lcms2::{CIExyY, Intent, PixelFormat, Profile, ThreadContext, Transform};
 use std::fs::File;
 use std::io::{BufReader, Seek};
 use std::path::PathBuf;
@@ -27,31 +27,66 @@ fn extract_pixels(file: &File) -> Result<ImageBuffer<Rgba<u16>, Vec<u16>>, anyho
     Ok(pixels)
 }
 
+struct CIELabPix {
+    l: f32,
+    a: f32,
+    b: f32,
+}
+
+fn into_cie_lab(
+    pixels: &ImageBuffer<Rgba<u16>, Vec<u16>>,
+    src_profile: &Profile<ThreadContext>,
+    context: &ThreadContext,
+) -> Result<Vec<CIELabPix>, anyhow::Error> {
+    let dest_profile = Profile::new_lab4_context(context, CIExyY::d50())?;
+
+    let t: Transform<[u16; 4], [f32; 3], ThreadContext> = Transform::new_context(
+        context,
+        src_profile,
+        PixelFormat::RGBA_16,
+        &dest_profile,
+        PixelFormat::Lab_FLT,
+        Intent::Perceptual,
+    )?;
+
+    let rgba_pixels = pixels
+        .chunks(4)
+        .map(|chunk| [chunk[0], chunk[1], chunk[2], chunk[3]])
+        .collect::<Vec<[u16; 4]>>();
+
+    let mut lab_pixels: Vec<[f32; 3]> = vec![[0.0; 3]; rgba_pixels.len()];
+
+    t.transform_pixels(&rgba_pixels, lab_pixels.as_mut_slice());
+
+    Ok(lab_pixels
+        .iter()
+        .map(|lab| CIELabPix {
+            l: lab[0] as f32,
+            a: lab[1] as f32,
+            b: lab[2] as f32,
+        })
+        .collect())
+}
+
 fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
+
+    let context = ThreadContext::new();
 
     let mut file = File::open(args.path)?;
     let icc_chunk = extract_icc_chunk(&file)?;
     file.rewind()?; // fail extract_pixels if not rewind
-    let pixels = extract_pixels(&file)?.into_raw();
+    let pixels = extract_pixels(&file)?;
 
     let src_profile = if let Some(icc_chunk) = icc_chunk {
-        ColorProfile::new_from_slice(&icc_chunk)?
+        Profile::new_icc_context(&context, &icc_chunk)?
     } else {
-        ColorProfile::new_srgb()
+        Profile::new_srgb_context(&context)
     };
 
-    let transform = src_profile.create_transform_16bit(
-        Layout::Rgba,
-        &ColorProfile::new_lab(),
-        Layout::Rgb,
-        TransformOptions::default(),
-    )?;
-
-    let mut lab_pixels = vec![0; 3 * pixels.len() / 4];
-    transform.transform(&pixels, &mut lab_pixels)?;
-    for lab in lab_pixels.chunks(3) {
-        println!("L: {}, a: {}, b: {}", lab[0], lab[1], lab[2]);
+    let lab_pixels = into_cie_lab(&pixels, &src_profile, &context)?;
+    for lab in lab_pixels {
+        println!("L: {}, a: {}, b: {}", lab.l, lab.a, lab.b);
     }
 
     Ok(())
