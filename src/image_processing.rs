@@ -1,10 +1,11 @@
+use crate::color_space::Lab;
 use image::{ImageBuffer, ImageDecoder, ImageReader, Rgba};
 use lcms2::{CIExyY, Intent, PixelFormat, Profile, ThreadContext, Transform};
 use std::io::BufReader;
 use std::path::PathBuf;
 use tokio::task::spawn_blocking;
 
-/// CIE Lab 色空間のピクセルデータ
+/// CIE Lab color space pixel data.
 #[derive(Debug, Clone)]
 pub struct CIELabPix {
     pub l: f32,
@@ -12,13 +13,7 @@ pub struct CIELabPix {
     pub b: f32,
 }
 
-/// 画像ファイルから ICC プロファイルを抽出する
-///
-/// # Arguments
-/// * `path` - 画像ファイルのパス
-///
-/// # Returns
-/// ICC プロファイルのバイト列（存在しない場合は None）
+/// extract icc chunk from image file as a byte sequence
 pub async fn extract_icc_chunk(path: PathBuf) -> Result<Option<Vec<u8>>, anyhow::Error> {
     spawn_blocking(move || {
         let file = std::fs::File::open(&path)?;
@@ -30,13 +25,7 @@ pub async fn extract_icc_chunk(path: PathBuf) -> Result<Option<Vec<u8>>, anyhow:
     .await?
 }
 
-/// 画像ファイルからピクセルデータを抽出する（RGBA16形式）
-///
-/// # Arguments
-/// * `path` - 画像ファイルのパス
-///
-/// # Returns
-/// RGBA16 形式のピクセルデータ
+/// extract pixels from image file as 16bit RGBA pixels
 pub async fn extract_pixels(
     path: PathBuf,
 ) -> Result<ImageBuffer<Rgba<u16>, Vec<u16>>, anyhow::Error> {
@@ -50,15 +39,9 @@ pub async fn extract_pixels(
     .await?
 }
 
-/// ICC プロファイルとピクセルデータを一度に抽出する
+/// extract icc chunk and pixels from image file at once
 ///
-/// 同じファイルを2回開く必要がある場合に効率的
-///
-/// # Arguments
-/// * `path` - 画像ファイルのパス
-///
-/// # Returns
-/// (ICC プロファイル（存在しない場合は None）, RGBA16 形式のピクセルデータ)
+/// efficient when same file is opened twice
 pub async fn extract_image_data(
     path: PathBuf,
 ) -> Result<(Option<Vec<u8>>, ImageBuffer<Rgba<u16>, Vec<u16>>), anyhow::Error> {
@@ -67,14 +50,12 @@ pub async fn extract_image_data(
 
         let mut file = std::fs::File::open(&path)?;
 
-        // ICC プロファイルを抽出（スコープで借用を終了させる）
         let icc_chunk = {
             let reader = ImageReader::new(BufReader::new(&file)).with_guessed_format()?;
             let mut decoder = reader.into_decoder()?;
             decoder.icc_profile()?
         };
 
-        // ファイルを巻き戻してピクセルを抽出
         file.rewind()?;
         let reader = ImageReader::new(BufReader::new(&file)).with_guessed_format()?;
         let img = reader.decode()?;
@@ -85,14 +66,7 @@ pub async fn extract_image_data(
     .await?
 }
 
-/// ピクセルデータを CIE Lab 色空間に変換する
-///
-/// # Arguments
-/// * `pixels` - RGBA16 形式のピクセルデータ
-/// * `icc_profile` - ICC プロファイルのバイト列（None の場合は sRGB を使用）
-///
-/// # Returns
-/// CIE Lab 色空間のピクセルデータ
+/// convert pixels to CIE Lab color space
 pub async fn into_cie_lab(
     pixels: ImageBuffer<Rgba<u16>, Vec<u16>>,
     icc_profile: Option<Vec<u8>>,
@@ -137,4 +111,3 @@ pub async fn into_cie_lab(
     })
     .await?
 }
-
