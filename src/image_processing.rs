@@ -5,14 +5,6 @@ use std::io::BufReader;
 use std::path::PathBuf;
 use tokio::task::spawn_blocking;
 
-/// CIE Lab color space pixel data.
-#[derive(Debug, Clone)]
-pub struct CIELabPix {
-    pub l: f32,
-    pub a: f32,
-    pub b: f32,
-}
-
 /// extract icc chunk from image file as a byte sequence
 pub async fn extract_icc_chunk(path: PathBuf) -> Result<Option<Vec<u8>>, anyhow::Error> {
     spawn_blocking(move || {
@@ -70,7 +62,7 @@ pub async fn extract_image_data(
 pub async fn into_cie_lab(
     pixels: ImageBuffer<Rgba<u16>, Vec<u16>>,
     icc_profile: Option<Vec<u8>>,
-) -> Result<Vec<CIELabPix>, anyhow::Error> {
+) -> Result<Vec<Lab>, anyhow::Error> {
     spawn_blocking(move || {
         let context = ThreadContext::new();
 
@@ -102,11 +94,7 @@ pub async fn into_cie_lab(
 
         Ok(lab_pixels
             .iter()
-            .map(|lab| CIELabPix {
-                l: lab[0],
-                a: lab[1],
-                b: lab[2],
-            })
+            .map(|lab| Lab::new(lab[0], lab[1], lab[2]))
             .collect())
     })
     .await?
