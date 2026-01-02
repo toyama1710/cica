@@ -3,7 +3,6 @@
 /// All structures use `#[repr(C)]` for fixed memory layout suitable for wgpu.
 
 const COLOR_EPSILON: f32 = 1.0 / 1024.0;
-const GAMMA_CORRECTION_FACTOR: f32 = 2.2;
 
 ///  CIE XYZ color space pixel.
 ///
@@ -23,7 +22,7 @@ const D50_XYZ: Xyz = Xyz {
     y: 1.0,
     z: 0.825188,
 };
-#[warn(dead_code)]
+#[allow(dead_code)]
 const D65_XYZ: Xyz = Xyz {
     x: 0.95047,
     y: 1.0,
@@ -136,7 +135,7 @@ fn linear_to_gamma(linear: f32) -> f32 {
     if linear <= 0.0031308 {
         linear * 12.92
     } else {
-        1.055 * linear.powf(1.0 / GAMMA_CORRECTION_FACTOR) - 0.055
+        1.055 * linear.powf(1.0 / 2.4) - 0.055
     }
 }
 
@@ -184,7 +183,7 @@ fn gamma_to_linear(gamma: f32) -> f32 {
     if gamma <= 0.040449936 {
         gamma / 12.92
     } else {
-        ((gamma + 0.055) / 1.055).powf(GAMMA_CORRECTION_FACTOR)
+        ((gamma + 0.055) / 1.055).powf(2.4)
     }
 }
 
