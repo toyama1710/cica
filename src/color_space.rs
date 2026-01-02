@@ -417,21 +417,21 @@ mod tests {
 
     #[test]
     fn test_round_trip() {
-        _test_round_trip(1.0, 0.0, 0.0, "Red");
-        _test_round_trip(0.0, 1.0, 0.0, "Green");
-        _test_round_trip(0.0, 0.0, 1.0, "Blue");
-        _test_round_trip(1.0, 1.0, 1.0, "White");
-        _test_round_trip(0.0, 0.0, 0.0, "Black");
-        _test_round_trip(0.5, 0.5, 0.5, "Gray");
+        check_round_trip(1.0, 0.0, 0.0, "Red");
+        check_round_trip(0.0, 1.0, 0.0, "Green");
+        check_round_trip(0.0, 0.0, 1.0, "Blue");
+        check_round_trip(1.0, 1.0, 1.0, "White");
+        check_round_trip(0.0, 0.0, 0.0, "Black");
+        check_round_trip(0.5, 0.5, 0.5, "Gray");
 
-        _test_round_trip(1.0, 1.0, 0.0, "Yellow");
-        _test_round_trip(0.0, 1.0, 1.0, "Cyan");
-        _test_round_trip(1.0, 0.0, 1.0, "Magenta");
+        check_round_trip(1.0, 1.0, 0.0, "Yellow");
+        check_round_trip(0.0, 1.0, 1.0, "Cyan");
+        check_round_trip(1.0, 0.0, 1.0, "Magenta");
 
-        _test_round_trip(0.2, 0.4, 0.6, "Mixed1");
-        _test_round_trip(0.8, 0.3, 0.1, "Mixed2");
+        check_round_trip(0.2, 0.4, 0.6, "Mixed1");
+        check_round_trip(0.8, 0.3, 0.1, "Mixed2");
     }
-    fn _test_round_trip(r: f32, g: f32, b: f32, name: &str) {
+    fn check_round_trip(r: f32, g: f32, b: f32, name: &str) {
         let srgb = Srgb::new(r, g, b);
         let xyz: Xyz = srgb.into();
         let lab: Lab = xyz.into();
@@ -462,16 +462,25 @@ mod tests {
 
     #[test]
     fn test_precision_when_convert_once() {
-        _test_precision_when_convert_once(1.0, 0.0, 0.0, "Red");
-        _test_precision_when_convert_once(0.0, 1.0, 0.0, "Green");
-        _test_precision_when_convert_once(0.0, 0.0, 1.0, "Blue");
-        _test_precision_when_convert_once(1.0, 1.0, 1.0, "White");
-        _test_precision_when_convert_once(0.0, 0.0, 0.0, "Black");
-        _test_precision_when_convert_once(0.5, 0.5, 0.5, "Gray");
-        _test_precision_when_convert_once(COLOR_EPSILON, COLOR_EPSILON, COLOR_EPSILON, "Epsilon");
+        check_precision_when_convert_once(1.0, 0.0, 0.0, "Red");
+        check_precision_when_convert_once(0.0, 1.0, 0.0, "Green");
+        check_precision_when_convert_once(0.0, 0.0, 1.0, "Blue");
+        check_precision_when_convert_once(1.0, 1.0, 1.0, "White");
+        check_precision_when_convert_once(0.0, 0.0, 0.0, "Black");
+        check_precision_when_convert_once(0.5, 0.5, 0.5, "Gray");
+        check_precision_when_convert_once(0.2, 0.4, 0.6, "Mixed1");
+        check_precision_when_convert_once(0.8, 0.3, 0.1, "Mixed2");
+        check_precision_when_convert_once(COLOR_EPSILON, COLOR_EPSILON, COLOR_EPSILON, "Epsilon");
     }
-    fn _test_precision_when_convert_once(x: f32, y: f32, z: f32, name: &str) {
-        let xyz = Xyz::new(x, y, z);
+    fn check_precision_when_convert_once(r: f32, g: f32, b: f32, name: &str) {
+        // Start from sRGB to ensure no clipping occurs
+        let srgb = Srgb::new(r, g, b);
+        let xyz: Xyz = srgb.into();
+
+        println!(
+            "{}: srgb ({:.6}, {:.6}, {:.6}) -> xyz ({:.6}, {:.6}, {:.6})",
+            name, srgb.r, srgb.g, srgb.b, xyz.x, xyz.y, xyz.z
+        );
 
         // xyz -> srgb -> xyz
         {
@@ -481,11 +490,11 @@ mod tests {
             let dy = (xyz.y - xyz2.y).abs();
             let dz = (xyz.z - xyz2.z).abs();
             println!(
-                "{}: xyz -> srgb -> xyz: ({:.6}, {:.6}, {:.6})",
-                name, xyz.x, xyz.y, xyz.z
+                "  xyz -> srgb -> xyz: ({:.6}, {:.6}, {:.6}) -> ({:.6}, {:.6}, {:.6})",
+                xyz.x, xyz.y, xyz.z, xyz2.x, xyz2.y, xyz2.z
             );
-            println!("  srgb: ({:.6}, {:.6}, {:.6})", srgb.r, srgb.g, srgb.b);
-            println!("  diff: dx={:.6}, dy={:.6}, dz={:.6}", dx, dy, dz);
+            println!("    srgb: ({:.6}, {:.6}, {:.6})", srgb.r, srgb.g, srgb.b);
+            println!("    diff: dx={:.6}, dy={:.6}, dz={:.6}", dx, dy, dz);
             assert!(dx < COLOR_EPSILON);
             assert!(dy < COLOR_EPSILON);
             assert!(dz < COLOR_EPSILON);
@@ -498,11 +507,11 @@ mod tests {
             let dy = (xyz.y - xyz2.y).abs();
             let dz = (xyz.z - xyz2.z).abs();
             println!(
-                "{}: xyz -> lab -> xyz: ({:.6}, {:.6}, {:.6})",
-                name, xyz.x, xyz.y, xyz.z
+                "  xyz -> lab -> xyz: ({:.6}, {:.6}, {:.6}) -> ({:.6}, {:.6}, {:.6})",
+                xyz.x, xyz.y, xyz.z, xyz2.x, xyz2.y, xyz2.z
             );
-            println!("  lab: ({:.6}, {:.6}, {:.6})", lab.l, lab.a, lab.b);
-            println!("  diff: dx={:.6}, dy={:.6}, dz={:.6}", dx, dy, dz);
+            println!("    lab: ({:.6}, {:.6}, {:.6})", lab.l, lab.a, lab.b);
+            println!("    diff: dx={:.6}, dy={:.6}, dz={:.6}", dx, dy, dz);
             assert!(dx < COLOR_EPSILON);
             assert!(dy < COLOR_EPSILON);
             assert!(dz < COLOR_EPSILON);
@@ -515,11 +524,11 @@ mod tests {
             let dy = (xyz.y - xyz2.y).abs();
             let dz = (xyz.z - xyz2.z).abs();
             println!(
-                "{}: xyz -> hsv -> xyz: ({:.6}, {:.6}, {:.6})",
-                name, xyz.x, xyz.y, xyz.z
+                "  xyz -> hsv -> xyz: ({:.6}, {:.6}, {:.6}) -> ({:.6}, {:.6}, {:.6})",
+                xyz.x, xyz.y, xyz.z, xyz2.x, xyz2.y, xyz2.z
             );
-            println!("  hsv: ({:.6}, {:.6}, {:.6})", hsv.h, hsv.s, hsv.v);
-            println!("  diff: dx={:.6}, dy={:.6}, dz={:.6}", dx, dy, dz);
+            println!("    hsv: ({:.6}, {:.6}, {:.6})", hsv.h, hsv.s, hsv.v);
+            println!("    diff: dx={:.6}, dy={:.6}, dz={:.6}", dx, dy, dz);
             assert!(dx < COLOR_EPSILON);
             assert!(dy < COLOR_EPSILON);
             assert!(dz < COLOR_EPSILON);
