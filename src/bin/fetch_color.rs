@@ -1,5 +1,5 @@
-use cica::color_space::{Hsv, Srgb, Xyz};
-use cica::image_processing::{extract_image_data, into_cie_lab};
+use cica::color_space::{Hsv, Lab, Srgb, Xyz};
+use cica::image_processing::{extract_image_data, into_cie_xyz};
 use clap::{Parser, ValueEnum};
 use std::path::PathBuf;
 
@@ -18,7 +18,7 @@ struct Args {
     #[arg(short, long)]
     path: PathBuf,
 
-    #[arg(short, long, value_enum, default_value_t = OutputColorSpace::Lab)]
+    #[arg(short, long, value_enum, default_value_t = OutputColorSpace::Xyz)]
     color_space: OutputColorSpace,
 }
 
@@ -38,31 +38,29 @@ async fn main() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let lab_pixels = into_cie_lab(pixels, icc_chunk).await?;
+    let xyz_pixels: Vec<Xyz> = into_cie_xyz(pixels, icc_chunk).await?;
 
     match args.color_space {
-        OutputColorSpace::Lab => {
-            for lab in lab_pixels {
-                println!("{}, {}, {}", lab.l, lab.a, lab.b);
-            }
-        }
         OutputColorSpace::Xyz => {
-            for lab in lab_pixels {
-                let xyz: Xyz = lab.into();
+            for xyz in &xyz_pixels {
                 println!("{}, {}, {}", xyz.x, xyz.y, xyz.z);
             }
         }
+        OutputColorSpace::Lab => {
+            for xyz in &xyz_pixels {
+                let lab: Lab = (*xyz).into();
+                println!("{}, {}, {}", lab.l, lab.a, lab.b);
+            }
+        }
         OutputColorSpace::Srgb => {
-            for lab in lab_pixels {
-                let xyz: Xyz = lab.into();
-                let srgb: Srgb = xyz.into();
+            for xyz in &xyz_pixels {
+                let srgb: Srgb = (*xyz).into();
                 println!("{}, {}, {}", srgb.r, srgb.g, srgb.b);
             }
         }
         OutputColorSpace::Hsv => {
-            for lab in lab_pixels {
-                let xyz: Xyz = lab.into();
-                let hsv: Hsv = xyz.into();
+            for xyz in &xyz_pixels {
+                let hsv: Hsv = (*xyz).into();
                 println!("{}, {}, {}", hsv.h, hsv.s, hsv.v);
             }
         }

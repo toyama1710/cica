@@ -1,6 +1,6 @@
-use crate::color_space::Lab;
+use crate::color_space::Xyz;
 use image::{ImageBuffer, ImageDecoder, ImageReader, Rgba};
-use lcms2::{CIExyY, Intent, PixelFormat, Profile, ThreadContext, Transform};
+use lcms2::{Intent, PixelFormat, Profile, ThreadContext, Transform};
 use std::io::BufReader;
 use std::path::PathBuf;
 use tokio::task::spawn_blocking;
@@ -58,11 +58,11 @@ pub async fn extract_image_data(
     .await?
 }
 
-/// convert pixels to CIE Lab color space
-pub async fn into_cie_lab(
+/// convert pixels to CIE XYZ color space (D50 illuminant)
+pub async fn into_cie_xyz(
     pixels: ImageBuffer<Rgba<u16>, Vec<u16>>,
     icc_profile: Option<Vec<u8>>,
-) -> Result<Vec<Lab>, anyhow::Error> {
+) -> Result<Vec<Xyz>, anyhow::Error> {
     spawn_blocking(move || {
         let context = ThreadContext::new();
 
@@ -72,14 +72,14 @@ pub async fn into_cie_lab(
             Profile::new_srgb_context(&context)
         };
 
-        let dest_profile = Profile::new_lab4_context(&context, CIExyY::d50())?;
+        let dest_profile = Profile::new_xyz_context(&context);
 
         let t: Transform<[u16; 4], [f32; 3], ThreadContext> = Transform::new_context(
             &context,
             &src_profile,
             PixelFormat::RGBA_16,
             &dest_profile,
-            PixelFormat::Lab_FLT,
+            PixelFormat::XYZ_FLT,
             Intent::Perceptual,
         )?;
 
@@ -88,13 +88,13 @@ pub async fn into_cie_lab(
             .map(|chunk| [chunk[0], chunk[1], chunk[2], chunk[3]])
             .collect::<Vec<[u16; 4]>>();
 
-        let mut lab_pixels: Vec<[f32; 3]> = vec![[0.0; 3]; rgba_pixels.len()];
+        let mut xyz_pixels: Vec<[f32; 3]> = vec![[0.0; 3]; rgba_pixels.len()];
 
-        t.transform_pixels(&rgba_pixels, lab_pixels.as_mut_slice());
+        t.transform_pixels(&rgba_pixels, xyz_pixels.as_mut_slice());
 
-        Ok(lab_pixels
+        Ok(xyz_pixels
             .iter()
-            .map(|lab| Lab::new(lab[0], lab[1], lab[2]))
+            .map(|xyz| Xyz::new(xyz[0], xyz[1], xyz[2]))
             .collect())
     })
     .await?
