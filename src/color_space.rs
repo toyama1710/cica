@@ -413,13 +413,24 @@ mod tests {
             _ => panic!("Expected Xyz variant"),
         }
     }
-}
 
-#[cfg(test)]
-mod round_trip_tests {
-    use super::*;
+    #[test]
+    fn test_round_trip() {
+        _test_round_trip(1.0, 0.0, 0.0, "Red");
+        _test_round_trip(0.0, 1.0, 0.0, "Green");
+        _test_round_trip(0.0, 0.0, 1.0, "Blue");
+        _test_round_trip(1.0, 1.0, 1.0, "White");
+        _test_round_trip(0.0, 0.0, 0.0, "Black");
+        _test_round_trip(0.5, 0.5, 0.5, "Gray");
 
-    fn test_round_trip(r: f32, g: f32, b: f32, name: &str) {
+        _test_round_trip(1.0, 1.0, 0.0, "Yellow");
+        _test_round_trip(0.0, 1.0, 1.0, "Cyan");
+        _test_round_trip(1.0, 0.0, 1.0, "Magenta");
+
+        _test_round_trip(0.2, 0.4, 0.6, "Mixed1");
+        _test_round_trip(0.8, 0.3, 0.1, "Mixed2");
+    }
+    fn _test_round_trip(r: f32, g: f32, b: f32, name: &str) {
         let srgb = Srgb::new(r, g, b);
         let xyz: Xyz = srgb.into();
         let lab: Lab = xyz.into();
@@ -449,19 +460,68 @@ mod round_trip_tests {
     }
 
     #[test]
-    fn test_round_trip_colors() {
-        test_round_trip(1.0, 0.0, 0.0, "Red");
-        test_round_trip(0.0, 1.0, 0.0, "Green");
-        test_round_trip(0.0, 0.0, 1.0, "Blue");
-        test_round_trip(1.0, 1.0, 1.0, "White");
-        test_round_trip(0.0, 0.0, 0.0, "Black");
-        test_round_trip(0.5, 0.5, 0.5, "Gray");
+    fn test_precision_when_convert_once() {
+        _test_precision_when_convert_once(1.0, 0.0, 0.0, "Red");
+        _test_precision_when_convert_once(0.0, 1.0, 0.0, "Green");
+        _test_precision_when_convert_once(0.0, 0.0, 1.0, "Blue");
+        _test_precision_when_convert_once(1.0, 1.0, 1.0, "White");
+        _test_precision_when_convert_once(0.0, 0.0, 0.0, "Black");
+        _test_precision_when_convert_once(0.5, 0.5, 0.5, "Gray");
+        _test_precision_when_convert_once(COLOR_EPSILON, COLOR_EPSILON, COLOR_EPSILON, "Epsilon");
+    }
+    fn _test_precision_when_convert_once(x: f32, y: f32, z: f32, name: &str) {
+        let xyz = Xyz::new(x, y, z);
 
-        test_round_trip(1.0, 1.0, 0.0, "Yellow");
-        test_round_trip(0.0, 1.0, 1.0, "Cyan");
-        test_round_trip(1.0, 0.0, 1.0, "Magenta");
-
-        test_round_trip(0.2, 0.4, 0.6, "Mixed1");
-        test_round_trip(0.8, 0.3, 0.1, "Mixed2");
+        // xyz -> srgb -> xyz
+        {
+            let srgb: Srgb = xyz.into();
+            let xyz2: Xyz = srgb.into();
+            let dx = (xyz.x - xyz2.x).abs();
+            let dy = (xyz.y - xyz2.y).abs();
+            let dz = (xyz.z - xyz2.z).abs();
+            println!(
+                "{}: xyz -> srgb -> xyz: ({:.6}, {:.6}, {:.6})",
+                name, xyz.x, xyz.y, xyz.z
+            );
+            println!("  srgb: ({:.6}, {:.6}, {:.6})", srgb.r, srgb.g, srgb.b);
+            println!("  diff: dx={:.6}, dy={:.6}, dz={:.6}", dx, dy, dz);
+            assert!(dx < COLOR_EPSILON);
+            assert!(dy < COLOR_EPSILON);
+            assert!(dz < COLOR_EPSILON);
+        }
+        // xyz -> lab -> xyz
+        {
+            let lab: Lab = xyz.into();
+            let xyz2: Xyz = lab.into();
+            let dx = (xyz.x - xyz2.x).abs();
+            let dy = (xyz.y - xyz2.y).abs();
+            let dz = (xyz.z - xyz2.z).abs();
+            println!(
+                "{}: xyz -> lab -> xyz: ({:.6}, {:.6}, {:.6})",
+                name, xyz.x, xyz.y, xyz.z
+            );
+            println!("  lab: ({:.6}, {:.6}, {:.6})", lab.l, lab.a, lab.b);
+            println!("  diff: dx={:.6}, dy={:.6}, dz={:.6}", dx, dy, dz);
+            assert!(dx < COLOR_EPSILON);
+            assert!(dy < COLOR_EPSILON);
+            assert!(dz < COLOR_EPSILON);
+        }
+        // xyz -> hsv -> xyz
+        {
+            let hsv: Hsv = xyz.into();
+            let xyz2: Xyz = hsv.into();
+            let dx = (xyz.x - xyz2.x).abs();
+            let dy = (xyz.y - xyz2.y).abs();
+            let dz = (xyz.z - xyz2.z).abs();
+            println!(
+                "{}: xyz -> hsv -> xyz: ({:.6}, {:.6}, {:.6})",
+                name, xyz.x, xyz.y, xyz.z
+            );
+            println!("  hsv: ({:.6}, {:.6}, {:.6})", hsv.h, hsv.s, hsv.v);
+            println!("  diff: dx={:.6}, dy={:.6}, dz={:.6}", dx, dy, dz);
+            assert!(dx < COLOR_EPSILON);
+            assert!(dy < COLOR_EPSILON);
+            assert!(dz < COLOR_EPSILON);
+        }
     }
 }
