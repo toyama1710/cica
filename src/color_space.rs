@@ -29,6 +29,25 @@ const D65_XYZ: Xyz = Xyz {
     z: 1.08883,
 };
 
+// Bradford chromatic adaptation matrices
+// see also: http://www.brucelindbloom.com/index.html?Eqn_ChromAdapt.html
+
+/// Bradford matrix for D50 → D65 chromatic adaptation
+#[rustfmt::skip]
+const BRADFORD_D50_TO_D65: [[f32; 3]; 3] = [
+    [ 0.9555766, -0.0230393,  0.0631636],
+    [-0.0282895,  1.0099416,  0.0210077],
+    [ 0.0122982, -0.0204830,  1.3299098],
+];
+
+/// Bradford matrix for D65 → D50 chromatic adaptation
+#[rustfmt::skip]
+const BRADFORD_D65_TO_D50: [[f32; 3]; 3] = [
+    [ 1.0478112,  0.0228866, -0.0501270],
+    [ 0.0295424,  0.9904844, -0.0170491],
+    [-0.0092345,  0.0150436,  0.7521316],
+];
+
 /// CIE Lab color space pixel.
 ///
 /// - L: Lightness [0.0, 100.0]
@@ -111,24 +130,86 @@ impl Hsv {
     }
 }
 
+// Lab - XYZ conversion constants
+const LAB_EPSILON: f32 = (6.0 * 6.0 * 6.0) / (29.0 * 29.0 * 29.0); // = (6/29)^3
+const LAB_FACTOR: f32 = 841.0 / 108.0 * 116.0;
+
+fn lab_f(t: f32) -> f32 {
+    if t > LAB_EPSILON {
+        t.powf(1.0 / 3.0)
+    } else {
+        LAB_FACTOR * t + 16.0
+    }
+}
+
+fn lab_f_inv(t: f32) -> f32 {
+    let t3 = t.powi(3);
+    if t3 > LAB_EPSILON {
+        t3
+    } else {
+        (t - 16.0) / LAB_FACTOR
+    }
+}
+
 fn xyz_to_lab(xyz: Xyz) -> (f32, f32, f32) {
     let x = xyz.x / D50_XYZ.x;
     let y = xyz.y / D50_XYZ.y;
     let z = xyz.z / D50_XYZ.z;
-    let l = 116.0 * y.powf(1.0 / 3.0) - 16.0;
-    let a = 500.0 * (x.powf(1.0 / 3.0) - y);
-    let b = 200.0 * (y.powf(1.0 / 3.0) - z);
+
+    let fx = lab_f(x);
+    let fy = lab_f(y);
+    let fz = lab_f(z);
+
+    let l = 116.0 * fy - 16.0;
+    let a = 500.0 * (fx - fy);
+    let b = 200.0 * (fy - fz);
     (l, a, b)
 }
 
-// assume that input is in D50 XYZ color space.
-// see also: http://www.brucelindbloom.com/index.html?Eqn_RGB_XYZ_Matrix.html
-fn xyz_to_linear_srgb(x: f32, y: f32, z: f32) -> (f32, f32, f32) {
-    let r = x * 3.2404542 + y * -1.5371385 + z * -0.4985314;
-    let g = x * -0.9692660 + y * 1.8760108 + z * 0.0415560;
-    let b = x * 0.0556434 + y * -0.2040259 + z * 1.0572252;
+fn lab_to_xyz(lab: Lab) -> (f32, f32, f32) {
+    let fy = (lab.l + 16.0) / 116.0;
+    let fx = lab.a / 500.0 + fy;
+    let fz = fy - lab.b / 200.0;
 
+    let x = lab_f_inv(fx) * D50_XYZ.x;
+    let y = lab_f_inv(fy) * D50_XYZ.y;
+    let z = lab_f_inv(fz) * D50_XYZ.z;
+    (x, y, z)
+}
+
+/// Apply a 3x3 matrix to XYZ values
+fn apply_matrix(m: &[[f32; 3]; 3], x: f32, y: f32, z: f32) -> (f32, f32, f32) {
+    let r = m[0][0] * x + m[0][1] * y + m[0][2] * z;
+    let g = m[1][0] * x + m[1][1] * y + m[1][2] * z;
+    let b = m[2][0] * x + m[2][1] * y + m[2][2] * z;
     (r, g, b)
+}
+
+/// Convert D50 XYZ to D65 XYZ using Bradford chromatic adaptation
+fn xyz_d50_to_d65(x: f32, y: f32, z: f32) -> (f32, f32, f32) {
+    apply_matrix(&BRADFORD_D50_TO_D65, x, y, z)
+}
+
+/// Convert D65 XYZ to D50 XYZ using Bradford chromatic adaptation
+fn xyz_d65_to_d50(x: f32, y: f32, z: f32) -> (f32, f32, f32) {
+    apply_matrix(&BRADFORD_D65_TO_D50, x, y, z)
+}
+
+// XYZ (D65) to linear sRGB matrix
+// see also: http://www.brucelindbloom.com/index.html?Eqn_RGB_XYZ_Matrix.html
+#[rustfmt::skip]
+const XYZ_D65_TO_LINEAR_SRGB: [[f32; 3]; 3] = [
+    [ 3.2404542, -1.5371385, -0.4985314],
+    [-0.9692660,  1.8760108,  0.0415560],
+    [ 0.0556434, -0.2040259,  1.0572252],
+];
+
+// Convert D50 XYZ to linear sRGB (via D65 chromatic adaptation)
+fn xyz_to_linear_srgb(x: f32, y: f32, z: f32) -> (f32, f32, f32) {
+    // First adapt from D50 to D65
+    let (x65, y65, z65) = xyz_d50_to_d65(x, y, z);
+    // Then convert D65 XYZ to linear sRGB
+    apply_matrix(&XYZ_D65_TO_LINEAR_SRGB, x65, y65, z65)
 }
 
 fn linear_to_gamma(linear: f32) -> f32 {
@@ -168,17 +249,6 @@ fn srgb_to_hsv(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     (h, s, v)
 }
 
-fn lab_to_xyz(lab: Lab) -> (f32, f32, f32) {
-    let fy = (lab.l + 16.0) / 116.0;
-    let fx = lab.a / 500.0 + fy;
-    let fz = fy - lab.b / 200.0;
-
-    let x = fx.powi(3) * D50_XYZ.x;
-    let y = fy.powi(3) * D50_XYZ.y;
-    let z = fz.powi(3) * D50_XYZ.z;
-    (x, y, z)
-}
-
 fn gamma_to_linear(gamma: f32) -> f32 {
     if gamma <= 0.040449936 {
         gamma / 12.92
@@ -191,13 +261,21 @@ fn srgb_to_linear_srgb(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     (gamma_to_linear(r), gamma_to_linear(g), gamma_to_linear(b))
 }
 
-// output is in D50 XYZ color space.
+// Linear sRGB to XYZ (D65) matrix
 // see also: http://www.brucelindbloom.com/index.html?Eqn_RGB_XYZ_Matrix.html
+#[rustfmt::skip]
+const LINEAR_SRGB_TO_XYZ_D65: [[f32; 3]; 3] = [
+    [0.4124564, 0.3575761, 0.1804375],
+    [0.2126729, 0.7151522, 0.0721750],
+    [0.0193339, 0.1191920, 0.9503041],
+];
+
+// Convert linear sRGB to D50 XYZ (via D65 chromatic adaptation)
 fn linear_srgb_to_xyz(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
-    let x = r * 0.4124564 + g * 0.357561 + b * 0.1804375;
-    let y = r * 0.2126729 + g * 0.7151522 + b * 0.0721750;
-    let z = r * 0.0193339 + g * 0.1191920 + b * 0.9503041;
-    (x, y, z)
+    // First convert linear sRGB to D65 XYZ
+    let (x65, y65, z65) = apply_matrix(&LINEAR_SRGB_TO_XYZ_D65, r, g, b);
+    // Then adapt from D65 to D50
+    xyz_d65_to_d50(x65, y65, z65)
 }
 
 fn srgb_to_xyz(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
@@ -296,10 +374,11 @@ mod tests {
 
     #[test]
     fn test_xyz_to_srgb() {
-        let xyz = D65_XYZ;
+        // D50 white point (used as PCS) should map to sRGB white
+        let xyz = D50_XYZ;
         let srgb: Srgb = xyz.into();
-        println!("srgb: {:?}", srgb);
-        // Ideally, R=1.0, G=1.0, B=1.0
+        println!("D50 XYZ -> srgb: {:?}", srgb);
+        // D50 XYZ white → sRGB white (via Bradford D50→D65 adaptation)
         assert!(srgb.r > 1.0 - COLOR_EPSILON && srgb.r <= 1.0);
         assert!(srgb.g > 1.0 - COLOR_EPSILON && srgb.g <= 1.0);
         assert!(srgb.b > 1.0 - COLOR_EPSILON && srgb.b <= 1.0);
