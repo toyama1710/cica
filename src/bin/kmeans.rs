@@ -1,3 +1,4 @@
+use std::io::{self, BufReader, Read};
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
@@ -10,11 +11,15 @@ use cica::kmeans::kmeans_pp;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    path: PathBuf,
+    #[arg(short)]
     /// Number of clusters
     k: usize,
+    #[arg(short, long)]
     /// Random seed for reproducibility
     seed: u64,
+    #[arg(short, long)]
+    /// Input CSV file (reads from stdin if not specified)
+    path: Option<PathBuf>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -33,7 +38,7 @@ fn default_w() -> f32 {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    let points = read_csv(&args.path)?;
+    let points = read_csv(args.path.as_ref())?;
 
     if points.is_empty() {
         anyhow::bail!("No points found in CSV file");
@@ -85,13 +90,28 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn read_csv(path: &PathBuf) -> Result<Vec<[f32; 4]>> {
+fn read_csv(path: Option<&PathBuf>) -> Result<Vec<[f32; 4]>> {
+    // Read all input data first
+    let data = match path {
+        Some(p) => std::fs::read_to_string(p)
+            .with_context(|| format!("Failed to open file: {}", p.display()))?,
+        None => {
+            let mut buf = String::new();
+            BufReader::new(io::stdin())
+                .read_to_string(&mut buf)
+                .context("Failed to read from stdin")?;
+            buf
+        }
+    };
+
+    // Detect if first line is a header (contains non-numeric values)
+    let has_headers = detect_header(&data);
+
     let mut reader = ReaderBuilder::new()
-        .has_headers(true)
+        .has_headers(has_headers)
         .comment(Some(b'#'))
         .trim(csv::Trim::All)
-        .from_path(path)
-        .with_context(|| format!("Failed to open file: {}", path.display()))?;
+        .from_reader(data.as_bytes());
 
     let mut points = Vec::new();
 
@@ -101,4 +121,21 @@ fn read_csv(path: &PathBuf) -> Result<Vec<[f32; 4]>> {
     }
 
     Ok(points)
+}
+
+/// Detect if the first non-comment line is a header row
+fn detect_header(data: &str) -> bool {
+    for line in data.lines() {
+        let trimmed = line.trim();
+        // Skip empty lines and comments
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        // Check if first field is numeric
+        if let Some(first_field) = trimmed.split(',').next() {
+            return first_field.trim().parse::<f32>().is_err();
+        }
+        break;
+    }
+    false
 }
