@@ -9,6 +9,7 @@ enum OutputColorSpace {
     Hsv,
     Srgb,
     Lab,
+    RawRgb,
 }
 
 #[derive(Parser, Debug)]
@@ -25,7 +26,18 @@ struct Args {
 async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
 
-    let (icc_chunk, pixels) = extract_image_data(args.path).await?;
+    let (icc_chunk, pixels) = extract_image_data(args.path.clone()).await?;
+
+    if matches!(args.color_space, OutputColorSpace::RawRgb) {
+        for pixel in pixels.chunks(4) {
+            let r = pixel[0] as f32 / 65535.0;
+            let g = pixel[1] as f32 / 65535.0;
+            let b = pixel[2] as f32 / 65535.0;
+            println!("{}, {}, {}", r, g, b);
+        }
+        return Ok(());
+    }
+
     let lab_pixels = into_cie_lab(pixels, icc_chunk).await?;
 
     match args.color_space {
@@ -54,6 +66,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 println!("{}, {}, {}", hsv.h, hsv.s, hsv.v);
             }
         }
+        OutputColorSpace::RawRgb => unreachable!(),
     }
 
     Ok(())
