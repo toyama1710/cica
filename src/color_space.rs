@@ -131,11 +131,11 @@ impl Hsv {
 }
 
 // Lab - XYZ conversion constants
-const LAB_EPSILON: f32 = (6.0 * 6.0 * 6.0) / (29.0 * 29.0 * 29.0); // = (6/29)^3
+const LAB_THRESHOLD: f32 = (6.0 / 29.0) * (6.0 / 29.0) * (6.0 / 29.0); // = (6/29)^3
 const LAB_FACTOR: f32 = 841.0 / 108.0 * 116.0;
 
 fn lab_f(t: f32) -> f32 {
-    if t > LAB_EPSILON {
+    if t > LAB_THRESHOLD {
         t.powf(1.0 / 3.0)
     } else {
         LAB_FACTOR * t + 16.0
@@ -144,7 +144,7 @@ fn lab_f(t: f32) -> f32 {
 
 fn lab_f_inv(t: f32) -> f32 {
     let t3 = t.powi(3);
-    if t3 > LAB_EPSILON {
+    if t3 > LAB_THRESHOLD {
         t3
     } else {
         (t - 16.0) / LAB_FACTOR
@@ -412,5 +412,56 @@ mod tests {
             ColorSpace::Xyz(l) => assert_eq!(l, xyz),
             _ => panic!("Expected Xyz variant"),
         }
+    }
+}
+
+#[cfg(test)]
+mod round_trip_tests {
+    use super::*;
+
+    fn test_round_trip(r: f32, g: f32, b: f32, name: &str) {
+        let srgb = Srgb::new(r, g, b);
+        let xyz: Xyz = srgb.into();
+        let lab: Lab = xyz.into();
+        let xyz2: Xyz = lab.into();
+        let hsv: Hsv = xyz2.into();
+        let xyz3: Xyz = hsv.into();
+        let srgb2: Srgb = xyz3.into();
+
+        let dr = (srgb.r - srgb2.r).abs();
+        let dg = (srgb.g - srgb2.g).abs();
+        let db = (srgb.b - srgb2.b).abs();
+
+        println!(
+            "{}: original ({:.4}, {:.4}, {:.4}) -> result ({:.4}, {:.4}, {:.4})",
+            name, srgb.r, srgb.g, srgb.b, srgb2.r, srgb2.g, srgb2.b
+        );
+        println!("  xyz: ({:.6}, {:.6}, {:.6})", xyz.x, xyz.y, xyz.z);
+        println!("  lab: ({:.4}, {:.4}, {:.4})", lab.l, lab.a, lab.b);
+        println!("  xyz2: ({:.6}, {:.6}, {:.6})", xyz2.x, xyz2.y, xyz2.z);
+        println!("  hsv: ({:.6}, {:.6}, {:.6})", hsv.h, hsv.s, hsv.v);
+        println!("  xyz3: ({:.6}, {:.6}, {:.6})", xyz3.x, xyz3.y, xyz3.z);
+        println!("  diff: dr={:.6}, dg={:.6}, db={:.6}", dr, dg, db);
+
+        assert!(dr < COLOR_EPSILON);
+        assert!(dg < COLOR_EPSILON);
+        assert!(db < COLOR_EPSILON);
+    }
+
+    #[test]
+    fn test_round_trip_colors() {
+        test_round_trip(1.0, 0.0, 0.0, "Red");
+        test_round_trip(0.0, 1.0, 0.0, "Green");
+        test_round_trip(0.0, 0.0, 1.0, "Blue");
+        test_round_trip(1.0, 1.0, 1.0, "White");
+        test_round_trip(0.0, 0.0, 0.0, "Black");
+        test_round_trip(0.5, 0.5, 0.5, "Gray");
+
+        test_round_trip(1.0, 1.0, 0.0, "Yellow");
+        test_round_trip(0.0, 1.0, 1.0, "Cyan");
+        test_round_trip(1.0, 0.0, 1.0, "Magenta");
+
+        test_round_trip(0.2, 0.4, 0.6, "Mixed1");
+        test_round_trip(0.8, 0.3, 0.1, "Mixed2");
     }
 }
