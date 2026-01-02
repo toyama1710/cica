@@ -133,12 +133,13 @@ impl Hsv {
 // Lab - XYZ conversion constants
 const LAB_THRESHOLD: f32 = (6.0 / 29.0) * (6.0 / 29.0) * (6.0 / 29.0); // = (6/29)^3
 const LAB_SLOPE: f32 = 841.0 / 108.0;
+const LAB_OFFSET: f32 = 4.0 / 29.0;
 
 fn lab_f(t: f32) -> f32 {
     if t > LAB_THRESHOLD {
         t.powf(1.0 / 3.0)
     } else {
-        LAB_SLOPE * t + 4.0 / 29.0
+        LAB_SLOPE * t + LAB_OFFSET
     }
 }
 
@@ -147,7 +148,7 @@ fn lab_f_inv(t: f32) -> f32 {
     if t3 > LAB_THRESHOLD {
         t3
     } else {
-        (t - 16.0) / LAB_SLOPE
+        (t - LAB_OFFSET) / LAB_SLOPE
     }
 }
 
