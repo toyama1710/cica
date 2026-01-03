@@ -35,7 +35,8 @@ fn default_w() -> f32 {
     1.0
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let args = Args::parse();
 
     let points = read_csv(args.path.as_ref())?;
@@ -52,14 +53,14 @@ fn main() -> Result<()> {
         );
     }
 
-    let result = kmeans_pp(&points, args.k, args.seed);
+    let result = kmeans_pp(points, args.k, args.seed).await;
 
     println!("# k-means++ clustering result");
     println!(
         "# k = {}, seed = {}, total points = {}",
         args.k,
         args.seed,
-        points.len()
+        result.clusters.iter().map(|c| c.len()).sum::<usize>()
     );
     println!();
 
