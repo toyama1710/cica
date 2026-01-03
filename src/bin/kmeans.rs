@@ -1,5 +1,6 @@
 use std::io::{self, BufReader, Read};
 use std::path::PathBuf;
+use std::time::Instant;
 
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -53,7 +54,11 @@ async fn main() -> Result<()> {
         );
     }
 
+    let start = Instant::now();
     let result = kmeans_pp(points, args.k, args.seed).await;
+    let end = Instant::now();
+    println!("# k-means++ clustering time: {:?}", end - start);
+    println!("# rayon threads: {}", rayon::current_num_threads());
 
     println!("# k-means++ clustering result");
     println!(
