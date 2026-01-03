@@ -14,7 +14,7 @@ struct Args {
     #[arg(short)]
     /// Number of clusters
     k: usize,
-    #[arg(short, long)]
+    #[arg(short, long, default_value_t = 1710)]
     /// Random seed for reproducibility
     seed: u64,
     #[arg(short, long)]
